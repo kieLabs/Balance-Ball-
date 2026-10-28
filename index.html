@@ -28,7 +28,14 @@ h1{font-size:clamp(2rem,7vw,3.2rem);font-weight:900;letter-spacing:.04em;line-he
 #utility-bar{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:15;display:flex;gap:8px}
 .util-btn{width:46px;height:46px;border:1px solid #7beaff88;border-radius:13px;background:#08172de8;color:#fff;font-size:1.35rem;font-weight:800;display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 18px #0005}
 .util-btn:active{background:#087ca4}
-#touch-controls{position:fixed;bottom:max(18px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:5;display:none;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,58px);gap:8px;touch-action:none}
+#touch-controls{display:none!important}
+#swipe-hint{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;color:#d9edff;background:#071326b8;border:1px solid #ffffff22;border-radius:20px;padding:9px 14px;font-size:.76rem;white-space:nowrap;pointer-events:none;text-align:center}
+#settings-panel{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:20px;background:#020612bb;backdrop-filter:blur(10px)}
+.settings-card{width:min(360px,100%);padding:24px;border:1px solid #53dfff66;border-radius:22px;background:linear-gradient(145deg,#10233d,#070d1c);box-shadow:0 18px 60px #0009;text-align:left}
+.settings-card h2{font-size:1.6rem;margin-bottom:18px;color:#eafaff}
+.setting-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid #ffffff20;color:#d9eaff}
+.setting-row input{width:22px;height:22px;accent-color:#00dfff}
+.settings-card .btn{width:100%;margin-top:20px}
 .joy-btn{border:1px solid #ffffff55;border-radius:18px;background:#0c1b31c9;color:#fff;font-size:1.5rem;font-weight:800;display:grid;place-items:center;backdrop-filter:blur(8px);touch-action:none}
 .joy-btn:active,.joy-btn.pressed{background:#0785b9d9}
 #btn-up{grid-column:2;grid-row:1}#btn-left{grid-column:1;grid-row:2}#btn-down{grid-column:2;grid-row:2}#btn-right{grid-column:3;grid-row:2}
@@ -46,6 +53,7 @@ h1{font-size:clamp(2rem,7vw,3.2rem);font-weight:900;letter-spacing:.04em;line-he
 </div>
 <div id="utility-bar">
   <button class="util-btn" id="btn-fullscreen" title="Toggle fullscreen" aria-label="Toggle fullscreen">⛶</button>
+  <button class="util-btn" id="btn-settings" title="Settings" aria-label="Settings">⚙</button>
   <button class="util-btn" id="btn-exit" title="Exit to home" aria-label="Exit to home">✕</button>
 </div>
 <div id="home-screen" class="ui-screen">
@@ -62,13 +70,10 @@ h1{font-size:clamp(2rem,7vw,3.2rem);font-weight:900;letter-spacing:.04em;line-he
   <p class="subtitle" id="final-stats">Your sphere left the pathway.</p>
   <button class="btn" id="btn-restart" style="background:linear-gradient(135deg,#ff416c,#ff9a44);color:white">Try Again</button>
 </div>
-<div id="touch-controls">
-  <button class="joy-btn" id="btn-up" aria-label="Move forward">↑</button>
-  <button class="joy-btn" id="btn-left" aria-label="Move left">←</button>
-  <button class="joy-btn" id="btn-down" aria-label="Move backward">↓</button>
-  <button class="joy-btn" id="btn-right" aria-label="Move right">→</button>
-</div>
-<div id="hint" class="hidden">Move: WASD / Arrow keys · Mobile: touch arrows</div>
+<div id="touch-controls" aria-hidden="true"></div>
+<div id="hint" class="hidden">Keyboard: ← → steer · Space/↑ jump</div>
+<div id="swipe-hint" class="hidden">SWIPE ← / → to steer · SWIPE ↑ to jump</div>
+<div id="settings-panel" class="hidden" role="dialog" aria-modal="true" aria-label="Game settings"><div class="settings-card"><h2>⚙ Settings</h2><label class="setting-row"><span>Sound effects</span><input id="sound-toggle" type="checkbox" checked></label><label class="setting-row"><span>Background music</span><input id="music-toggle" type="checkbox" checked></label><button class="btn" id="btn-settings-close">Done</button></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
@@ -80,11 +85,25 @@ let scene,camera,renderer,ball,ballMesh,ballShadow;
 let platforms=[],decorations=[];
 let isPlaying=false,animationId=0,lastTime=0,score=0,level=1,forwardSpeed=8;
 let nextZ=0,elapsed=0;
+let jumpVelocity=0, isJumping=false;
+let audioCtx=null, masterGain=null, musicGain=null, musicTimer=null, musicStep=0;
+let soundEnabled=true,musicEnabled=true;
+let swipeStart=null,swipePointerId=null;
 const keys={up:false,down:false,left:false,right:false};
 const velocity=new THREE.Vector3();
 const gravity=22, acceleration=26, friction=0.91, maxSideSpeed=9;
 const ballRadius=.62, platformWidth=7, segmentLength=14;
 const clock=new THREE.Clock();
+function initAudio(){
+  if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioCtx=new AC();masterGain=audioCtx.createGain();masterGain.gain.value=soundEnabled?0.65:0;masterGain.connect(audioCtx.destination);musicGain=audioCtx.createGain();musicGain.gain.value=musicEnabled?0.14:0;musicGain.connect(masterGain);}
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  if(!musicTimer)startMusic();
+}
+function tone(freq,duration,type='sine',gain=.12,when=0){if(!audioCtx||!soundEnabled)return;const t=audioCtx.currentTime+when,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(gain,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g);g.connect(masterGain);o.start(t);o.stop(t+duration+.03);}
+function startMusic(){if(!audioCtx||musicTimer)return;const notes=[261.63,329.63,392,329.63,293.66,349.23,440,349.23,261.63,329.63,392,523.25,349.23,392,440,392];musicTimer=setInterval(()=>{if(!audioCtx||!musicEnabled||audioCtx.state!=='running')return;const t=audioCtx.currentTime;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=notes[musicStep%notes.length];g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.11,t+.06);g.gain.exponentialRampToValueAtTime(.0001,t+.38);o.connect(g);g.connect(musicGain);o.start(t);o.stop(t+.4);if(musicStep%4===0){const b=audioCtx.createOscillator(),bg=audioCtx.createGain();b.type='sine';b.frequency.value=notes[musicStep%notes.length]/2;bg.gain.setValueAtTime(.0001,t);bg.gain.exponentialRampToValueAtTime(.045,t+.04);bg.gain.exponentialRampToValueAtTime(.0001,t+.5);b.connect(bg);bg.connect(musicGain);b.start(t);b.stop(t+.52);}musicStep++;},420);}
+function setSound(on){soundEnabled=on;if(masterGain)masterGain.gain.setTargetAtTime(on?0.65:0,audioCtx.currentTime,.04);}
+function setMusic(on){musicEnabled=on;if(musicGain&&audioCtx)musicGain.gain.setTargetAtTime(on?0.14:0,audioCtx.currentTime,.05);if(on)initAudio();}
+function jump(){if(!isPlaying||isJumping)return;isJumping=true;jumpVelocity=9.2;tone(620,.16,'sine',.18);tone(880,.2,'triangle',.08,.06);}
 
 function init3DEngine(){
   if (!window.THREE) throw new Error('Three.js CDN did not load');
@@ -173,11 +192,11 @@ function generateAhead(){
 }
 function launchSession(){
   resetWorld();score=0;level=1;elapsed=0;forwardSpeed=8;
-  ball.position.set(0,ballRadius+.18,1);ball.rotation.set(0,0,0);velocity.set(0,0,0);
+  ball.position.set(0,ballRadius+.18,1);ball.rotation.set(0,0,0);velocity.set(0,0,0);jumpVelocity=0;isJumping=false;
   camera.position.set(0,7,10);camera.lookAt(0,0,-8);
   isPlaying=true;lastTime=performance.now();
   homeScreen.classList.add('hidden');gameoverScreen.classList.add('hidden');
-  hud.classList.remove('hidden');hint.classList.remove('hidden');
+  hud.classList.remove('hidden');hint.classList.remove('hidden');$('swipe-hint').classList.remove('hidden');initAudio();
   $('score-val').textContent='0';$('level-val').textContent='1';
   Object.keys(keys).forEach(k=>keys[k]=false);
 }
@@ -185,27 +204,27 @@ function endGame(){
   if(!isPlaying)return;
   isPlaying=false;
   $('final-stats').textContent=`Distance score: ${score} · Level reached: ${level}. Keep practicing!`;
-  gameoverScreen.classList.remove('hidden');hud.classList.add('hidden');hint.classList.add('hidden');
+  gameoverScreen.classList.remove('hidden');hud.classList.add('hidden');hint.classList.add('hidden');$('swipe-hint').classList.add('hidden');tone(180,.45,'sawtooth',.15);
   Object.keys(keys).forEach(k=>keys[k]=false);
 }
 function bindInputEventListeners(){
-  const keyMap={ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down',ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right'};
-  window.addEventListener('keydown',e=>{const k=keyMap[e.key];if(k){keys[k]=true;e.preventDefault();}});
+  const keyMap={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right'};
+  window.addEventListener('keydown',e=>{const k=keyMap[e.key];if(k){keys[k]=true;e.preventDefault();}if([' ','ArrowUp','w','W'].includes(e.key)){if(isPlaying){jump();e.preventDefault();}}});
   window.addEventListener('keyup',e=>{const k=keyMap[e.key];if(k){keys[k]=false;e.preventDefault();}});
   window.addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));
-  const map={'btn-up':'up','btn-down':'down','btn-left':'left','btn-right':'right'};
-  Object.entries(map).forEach(([id,key])=>{
-    const el=$(id);
-    const on=e=>{e.preventDefault();keys[key]=true;el.classList.add('pressed');try{el.setPointerCapture(e.pointerId)}catch(_){}};
-    const off=e=>{e.preventDefault();keys[key]=false;el.classList.remove('pressed')};
-    el.addEventListener('pointerdown',on);el.addEventListener('pointerup',off);
-    el.addEventListener('pointercancel',off);el.addEventListener('lostpointercapture',off);
-    el.addEventListener('contextmenu',e=>e.preventDefault());
-  });
+  const canvasArea=$('canvas-container');
+  canvasArea.addEventListener('pointerdown',e=>{if(!isPlaying)return;swipeStart={x:e.clientX,y:e.clientY,time:performance.now()};swipePointerId=e.pointerId;try{canvasArea.setPointerCapture(e.pointerId)}catch(_){};});
+  canvasArea.addEventListener('pointerup',e=>{if(!swipeStart||e.pointerId!==swipePointerId)return;const dx=e.clientX-swipeStart.x,dy=e.clientY-swipeStart.y;const ax=Math.abs(dx),ay=Math.abs(dy);if(ay>42&&dy < -Math.max(42,ax*.8)){jump();}else if(ax>12){velocity.x=THREE.MathUtils.clamp(velocity.x+dx*.055,-maxSideSpeed,maxSideSpeed);}swipeStart=null;swipePointerId=null;});
+  canvasArea.addEventListener('pointercancel',()=>{swipeStart=null;swipePointerId=null;});
+  canvasArea.addEventListener('contextmenu',e=>e.preventDefault());
   $('btn-play').addEventListener('click',launchSession);
   $('btn-restart').addEventListener('click',launchSession);
+  $('btn-settings').addEventListener('click',()=>{$('settings-panel').classList.remove('hidden');});
+  $('btn-settings-close').addEventListener('click',()=>{$('settings-panel').classList.add('hidden');});
+  $('sound-toggle').addEventListener('change',e=>setSound(e.target.checked));
+  $('music-toggle').addEventListener('change',e=>setMusic(e.target.checked));
   $('btn-exit').addEventListener('click',()=>{
-    isPlaying=false;hud.classList.add('hidden');hint.classList.add('hidden');
+    isPlaying=false;hud.classList.add('hidden');hint.classList.add('hidden');$('swipe-hint').classList.add('hidden');
     gameoverScreen.classList.add('hidden');homeScreen.classList.remove('hidden');
     Object.keys(keys).forEach(k=>keys[k]=false);
   });
@@ -226,7 +245,7 @@ function update(dt){
   const zSpeed=forwardSpeed + (iz<0?2:iz>0?-2:0);
   ball.position.x+=velocity.x*dt;
   ball.position.z-=Math.max(3,zSpeed)*dt;
-  ball.position.y=ballRadius+.18+Math.abs(Math.sin(elapsed*5))*.045;
+  if(isJumping){jumpVelocity-=gravity*dt;ball.position.y+=jumpVelocity*dt;if(ball.position.y<=ballRadius+.18){ball.position.y=ballRadius+.18;jumpVelocity=0;isJumping=false;}}else{ball.position.y=ballRadius+.18+Math.abs(Math.sin(elapsed*5))*.025;}
   ballMesh.rotation.x-=dt*forwardSpeed/ballRadius;
   ballMesh.rotation.z-=velocity.x*dt/ballRadius;
   ballShadow.position.set(ball.position.x,.02,ball.position.z);
@@ -241,7 +260,7 @@ function update(dt){
     ball.position.z<=p.z+p.length/2+ballRadius*.2 &&
     ball.position.z>=p.z-p.length/2-ballRadius*.2
   );
-  if(!support || ball.position.y < -3 || Math.abs(ball.position.x)>14){endGame();return;}
+  if((!support && ball.position.y<=ballRadius+.25) || ball.position.y < -3 || Math.abs(ball.position.x)>14){endGame();return;}
   score=Math.max(score,Math.floor(Math.abs(ball.position.z)/2));
   level=1+Math.floor(score/180);
   $('score-val').textContent=score.toLocaleString();

@@ -87,6 +87,7 @@ const ballRadius=.62, platformWidth=7, segmentLength=14;
 const clock=new THREE.Clock();
 
 function init3DEngine(){
+  if (!window.THREE) throw new Error('Three.js CDN did not load');
   scene=new THREE.Scene();
   scene.background=new THREE.Color(0x050510);
   scene.fog=new THREE.Fog(0x050510,28,105);
@@ -105,9 +106,9 @@ function init3DEngine(){
   scene.add(keyLight);
   const rim=new THREE.PointLight(0x00d9ff,22,45);rim.position.set(5,5,-12);scene.add(rim);
   createBall();
-  makePlatform(0,-7,segmentLength,0);
-  makePlatform(0,-21,segmentLength,0);
-  nextZ=-28;
+  makePlatform(0,0,30,platformWidth);
+  makePlatform(0,-30,30,platformWidth);
+  nextZ=-60;
   createStars();
   bindInputEventListeners();
   window.addEventListener('resize',onWindowResize);
@@ -153,9 +154,9 @@ function resetWorld(){
   platforms.forEach(p=>scene.remove(p.mesh));platforms=[];
   decorations.forEach(d=>scene.remove(d));decorations=[];
   // Keep world scenery simple and deterministic at each restart.
-  makePlatform(0,-7,segmentLength,0);
-  makePlatform(0,-21,segmentLength,0);
-  nextZ=-28;
+  makePlatform(0,0,30,platformWidth);
+  makePlatform(0,-30,30,platformWidth);
+  nextZ=-60;
 }
 function generateAhead(){
   while(nextZ > ball.position.z-105){

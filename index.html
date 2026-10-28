@@ -61,7 +61,7 @@ h1{font-size:clamp(2rem,7vw,3.2rem);font-weight:900;letter-spacing:.04em;line-he
     <svg viewBox="0 0 100 100" role="img" aria-hidden="true"><defs><linearGradient id="ballGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".45" stop-color="#d9faff"/><stop offset="1" stop-color="#2476c9"/></linearGradient></defs><circle cx="50" cy="50" r="34" fill="url(#ballGrad)" stroke="#fff" stroke-width="2"/><path d="M18 40 Q50 10 82 40 M17 59 Q50 88 83 59 M50 16 Q32 50 50 84 M50 16 Q68 50 50 84" fill="none" stroke="#0874b9" stroke-width="3" opacity=".8"/><path d="M15 50 H85" stroke="#fff" stroke-width="2" opacity=".65"/></svg>
   </div>
   <h1>Balance Sphere</h1>
-  <p class="subtitle">Control the sphere, keep your balance, and travel across an endless 3D pathway. How far can you go?</p>
+  <p class="subtitle">Swipe left or right to steer. Swipe up to jump across gaps. The endless track changes its colors, width, gaps, and difficulty as you play.</p>
   <button class="btn" id="btn-play">Play Now</button>
 </div>
 <div id="gameover-screen" class="ui-screen hidden">
@@ -84,15 +84,16 @@ const homeScreen=$('home-screen'), gameoverScreen=$('gameover-screen'), hud=$('h
 let scene,camera,renderer,ball,ballMesh,ballShadow;
 let platforms=[],decorations=[];
 let isPlaying=false,animationId=0,lastTime=0,score=0,level=1,forwardSpeed=8;
-let nextZ=0,elapsed=0;
+let nextZ=0,elapsed=0,segmentCount=0,worldTheme=0;
 let jumpVelocity=0, isJumping=false;
 let audioCtx=null, masterGain=null, musicGain=null, musicTimer=null, musicStep=0;
 let soundEnabled=true,musicEnabled=true;
 let swipeStart=null,swipePointerId=null;
 const keys={up:false,down:false,left:false,right:false};
 const velocity=new THREE.Vector3();
-const gravity=22, acceleration=26, friction=0.91, maxSideSpeed=9;
+const gravity=20, acceleration=30, friction=0.91, maxSideSpeed=10;
 const ballRadius=.62, platformWidth=7, segmentLength=14;
+const worldPalettes=[{bg:0x050510,fog:0x050510,edge:0x00dfff,platform:0x142947,glow:0x06172b},{bg:0x10071c,fog:0x10071c,edge:0xff5de4,platform:0x32133f,glow:0x21092c},{bg:0x041510,fog:0x041510,edge:0x8dff72,platform:0x12392d,glow:0x08271d},{bg:0x140b04,fog:0x140b04,edge:0xffbd58,platform:0x45301b,glow:0x281706},{bg:0x06102a,fog:0x06102a,edge:0x7b8cff,platform:0x1a2450,glow:0x0c1230}];
 const clock=new THREE.Clock();
 function initAudio(){
   if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioCtx=new AC();masterGain=audioCtx.createGain();masterGain.gain.value=soundEnabled?0.65:0;masterGain.connect(audioCtx.destination);musicGain=audioCtx.createGain();musicGain.gain.value=musicEnabled?0.14:0;musicGain.connect(masterGain);}
@@ -103,7 +104,7 @@ function tone(freq,duration,type='sine',gain=.12,when=0){if(!audioCtx||!soundEna
 function startMusic(){if(!audioCtx||musicTimer)return;const notes=[261.63,329.63,392,329.63,293.66,349.23,440,349.23,261.63,329.63,392,523.25,349.23,392,440,392];musicTimer=setInterval(()=>{if(!audioCtx||!musicEnabled||audioCtx.state!=='running')return;const t=audioCtx.currentTime;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=notes[musicStep%notes.length];g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.11,t+.06);g.gain.exponentialRampToValueAtTime(.0001,t+.38);o.connect(g);g.connect(musicGain);o.start(t);o.stop(t+.4);if(musicStep%4===0){const b=audioCtx.createOscillator(),bg=audioCtx.createGain();b.type='sine';b.frequency.value=notes[musicStep%notes.length]/2;bg.gain.setValueAtTime(.0001,t);bg.gain.exponentialRampToValueAtTime(.045,t+.04);bg.gain.exponentialRampToValueAtTime(.0001,t+.5);b.connect(bg);bg.connect(musicGain);b.start(t);b.stop(t+.52);}musicStep++;},420);}
 function setSound(on){soundEnabled=on;if(masterGain)masterGain.gain.setTargetAtTime(on?0.65:0,audioCtx.currentTime,.04);}
 function setMusic(on){musicEnabled=on;if(musicGain&&audioCtx)musicGain.gain.setTargetAtTime(on?0.14:0,audioCtx.currentTime,.05);if(on)initAudio();}
-function jump(){if(!isPlaying||isJumping)return;isJumping=true;jumpVelocity=9.2;tone(620,.16,'sine',.18);tone(880,.2,'triangle',.08,.06);}
+function jump(){if(!isPlaying||isJumping)return;isJumping=true;jumpVelocity=13.8;tone(620,.16,'sine',.18);tone(880,.2,'triangle',.08,.06);}
 
 function init3DEngine(){
   if (!window.THREE) throw new Error('Three.js CDN did not load');
@@ -125,9 +126,10 @@ function init3DEngine(){
   scene.add(keyLight);
   const rim=new THREE.PointLight(0x00d9ff,22,45);rim.position.set(5,5,-12);scene.add(rim);
   createBall();
-  makePlatform(0,0,30,platformWidth);
-  makePlatform(0,-30,30,platformWidth);
-  nextZ=-60;
+  segmentCount=0;worldTheme=0;scene.background.setHex(worldPalettes[0].bg);scene.fog.color.setHex(worldPalettes[0].fog);
+  makePlatform(0,0,30,platformWidth,worldPalettes[0]);
+  makePlatform(0,-30,30,platformWidth,worldPalettes[0]);
+  nextZ=-52;
   createStars();
   bindInputEventListeners();
   window.addEventListener('resize',onWindowResize);
@@ -144,12 +146,12 @@ function createBall(){
   const stripe=new THREE.Mesh(new THREE.TorusGeometry(ballRadius*.72,.045,8,48),new THREE.MeshStandardMaterial({color:0xffffff,metalness:.4,roughness:.25,emissive:0x0a5c86}));
   stripe.rotation.x=Math.PI/2;ballMesh.add(stripe);
 }
-function makePlatform(x,z,length,width=platformWidth){
+function makePlatform(x,z,length,width=platformWidth,theme=worldPalettes[0]){
   const geo=new THREE.BoxGeometry(width,.55,length);
-  const mat=new THREE.MeshStandardMaterial({color:0x142947,metalness:.45,roughness:.35,emissive:0x06172b});
+  const mat=new THREE.MeshStandardMaterial({color:theme.platform,metalness:.45,roughness:.35,emissive:theme.glow});
   const mesh=new THREE.Mesh(geo,mat);mesh.position.set(x,-.3,z);mesh.receiveShadow=true;mesh.castShadow=true;
   scene.add(mesh);platforms.push({mesh,x,z,length,width});
-  const edgeMat=new THREE.MeshStandardMaterial({color:0x00dfff,emissive:0x007caa,metalness:.4,roughness:.25});
+  const edgeMat=new THREE.MeshStandardMaterial({color:theme.edge,emissive:theme.edge,metalness:.4,roughness:.25});
   for(const side of [-1,1]){
     const edge=new THREE.Mesh(new THREE.BoxGeometry(.075,.07,length),edgeMat);
     edge.position.set(x+side*(width/2-.05),.02,z);scene.add(edge);decorations.push(edge);
@@ -157,7 +159,7 @@ function makePlatform(x,z,length,width=platformWidth){
   // Small glowing markers along both edges make the path readable.
   for(let dz=-length/2+2;dz<length/2;dz+=4){
     for(const side of [-1,1]){
-      const marker=new THREE.Mesh(new THREE.BoxGeometry(.14,.08,.38),new THREE.MeshBasicMaterial({color:0x57efff}));
+      const marker=new THREE.Mesh(new THREE.BoxGeometry(.14,.08,.38),new THREE.MeshBasicMaterial({color:theme.edge}));
       marker.position.set(x+side*(width/2-.28),.06,z+dz);scene.add(marker);decorations.push(marker);
     }
   }
@@ -173,25 +175,40 @@ function resetWorld(){
   platforms.forEach(p=>scene.remove(p.mesh));platforms=[];
   decorations.forEach(d=>scene.remove(d));decorations=[];
   // Keep world scenery simple and deterministic at each restart.
-  makePlatform(0,0,30,platformWidth);
-  makePlatform(0,-30,30,platformWidth);
-  nextZ=-60;
+  segmentCount=0;worldTheme=0;scene.background.setHex(worldPalettes[0].bg);scene.fog.color.setHex(worldPalettes[0].fog);
+  makePlatform(0,0,30,platformWidth,worldPalettes[0]);
+  makePlatform(0,-30,30,platformWidth,worldPalettes[0]);
+  nextZ=-52;
 }
 function generateAhead(){
-  while(nextZ > ball.position.z-105){
+  // Procedural endless track: every segment gets a fresh width, offset, length, gap and palette.
+  while(nextZ > ball.position.z-115){
     const previous=platforms[platforms.length-1];
-    const maxShift=Math.min(2.0,0.35+level*.08);
+    segmentCount++;
+    const wave=Math.floor(elapsed/28)%4; // difficulty cycles: easy, medium, hard, recovery
+    const difficulty=[0.15,0.48,0.82,0.28][wave];
+    if(segmentCount%5===0){
+      worldTheme=(worldTheme+1+Math.floor(Math.random()*2))%worldPalettes.length;
+      const palette=worldPalettes[worldTheme];
+      scene.background.setHex(palette.bg);scene.fog.color.setHex(palette.fog);
+    }
+    const theme=worldPalettes[worldTheme];
+    const maxShift=0.7+difficulty*1.7+Math.min(.5,level*.025);
     const shift=(Math.random()-.5)*maxShift*2;
-    const x=THREE.MathUtils.clamp((previous?previous.x:0)+shift,-2.2,2.2);
-    const width=Math.max(4.6,platformWidth-Math.min(1.4,level*.08));
-    makePlatform(x,nextZ,segmentLength,width);
-    nextZ-=segmentLength;
+    const x=THREE.MathUtils.clamp((previous?previous.x:0)+shift,-2.0,2.0);
+    const width=Math.max(4.1,7.1-difficulty*1.8-Math.random()*.9-Math.min(1.0,level*.025));
+    const length=9.5+Math.random()*4.8-difficulty*1.0;
+    const gap=0.45+Math.random()*(1.0+difficulty*2.3);
+    makePlatform(x,nextZ,length,width,theme);
+    // The jump arc now reaches well beyond the largest generated gap.
+    nextZ-=previous.length/2+length/2+gap;
   }
-  platforms=platforms.filter(p=>{if(p.z>ball.position.z+35){scene.remove(p.mesh);return false;}return true;});
-  decorations=decorations.filter(d=>{if(d.position.z>ball.position.z+35){scene.remove(d);return false;}return true;});
+  platforms=platforms.filter(p=>{if(p.z>ball.position.z+35){scene.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();return false;}return true;});
+  decorations=decorations.filter(d=>{if(d.position.z>ball.position.z+35){scene.remove(d);d.geometry.dispose();if(d.material&&d.material.dispose)d.material.dispose();return false;}return true;});
 }
+
 function launchSession(){
-  resetWorld();score=0;level=1;elapsed=0;forwardSpeed=8;
+  resetWorld();score=0;level=1;elapsed=0;forwardSpeed=8;segmentCount=0;worldTheme=0;
   ball.position.set(0,ballRadius+.18,1);ball.rotation.set(0,0,0);velocity.set(0,0,0);jumpVelocity=0;isJumping=false;
   camera.position.set(0,7,10);camera.lookAt(0,0,-8);
   isPlaying=true;lastTime=performance.now();
@@ -214,7 +231,7 @@ function bindInputEventListeners(){
   window.addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));
   const canvasArea=$('canvas-container');
   canvasArea.addEventListener('pointerdown',e=>{if(!isPlaying)return;swipeStart={x:e.clientX,y:e.clientY,time:performance.now()};swipePointerId=e.pointerId;try{canvasArea.setPointerCapture(e.pointerId)}catch(_){};});
-  canvasArea.addEventListener('pointerup',e=>{if(!swipeStart||e.pointerId!==swipePointerId)return;const dx=e.clientX-swipeStart.x,dy=e.clientY-swipeStart.y;const ax=Math.abs(dx),ay=Math.abs(dy);if(ay>42&&dy < -Math.max(42,ax*.8)){jump();}else if(ax>12){velocity.x=THREE.MathUtils.clamp(velocity.x+dx*.055,-maxSideSpeed,maxSideSpeed);}swipeStart=null;swipePointerId=null;});
+  canvasArea.addEventListener('pointerup',e=>{if(!swipeStart||e.pointerId!==swipePointerId)return;const dx=e.clientX-swipeStart.x,dy=e.clientY-swipeStart.y;const ax=Math.abs(dx),ay=Math.abs(dy);if(ay>30&&dy < -Math.max(30,ax*.65)){jump();}else if(ax>18){velocity.x=THREE.MathUtils.clamp(velocity.x+dx*.075,-maxSideSpeed,maxSideSpeed);}swipeStart=null;swipePointerId=null;});
   canvasArea.addEventListener('pointercancel',()=>{swipeStart=null;swipePointerId=null;});
   canvasArea.addEventListener('contextmenu',e=>e.preventDefault());
   $('btn-play').addEventListener('click',launchSession);
@@ -235,7 +252,11 @@ function bindInputEventListeners(){
 }
 function update(dt){
   if(!isPlaying)return;
-  elapsed+=dt;forwardSpeed=8+Math.min(7,elapsed*.07);
+  elapsed+=dt;
+  // Smooth speed waves keep play changing without a fixed finish line.
+  const wave=Math.floor(elapsed/28)%4;
+  const waveBoost=[0,1.8,3.8,.8][wave];
+  forwardSpeed=8+Math.min(4.5,elapsed*.025)+waveBoost+Math.sin(elapsed*.38)*.45;
   const ix=(keys.right?1:0)-(keys.left?1:0);
   const iz=(keys.down?1:0)-(keys.up?1:0);
   velocity.x+=ix*acceleration*dt;

@@ -1,344 +1,264 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Balance Sphere: Infinite Dimensions</title>
-    <!-- Include Three.js via high-speed CDN -->
-    <script src="https://cloudflare.com"></script>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body, html {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #050510;
-        }
-        #canvas-container {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1;
-        }
-        
-        /* High Definition UI Overlay Screens */
-        .ui-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: radial-gradient(circle at center, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.99) 100%);
-            transition: opacity 0.4s ease, transform 0.4s ease;
-        }
-        
-        .hidden {
-            opacity: 0;
-            pointer-events: none;
-            transform: scale(1.05);
-        }
-
-        /* Branding Logo Element */
-        .game-logo {
-            width: 140px;
-            height: 140px;
-            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 0 50px rgba(0, 242, 254, 0.5);
-            margin-bottom: 25px;
-            animation: float 4s ease-in-out infinite;
-            border: 4px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-        }
-        .game-logo::after {
-            content: '';
-            position: absolute;
-            width: 85%;
-            height: 85%;
-            border-radius: 50%;
-            border: 2px dashed rgba(255, 255, 255, 0.4);
-            animation: spin 20s linear infinite;
-        }
-        .game-logo-inner {
-            font-size: 55px;
-            filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.3));
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-12px) rotate(5deg); }
-        }
-        @keyframes spin {
-            100% { transform: rotate(360deg); }
-        }
-
-        h1 {
-            color: #ffffff;
-            font-size: 3rem;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-            text-align: center;
-            background: linear-gradient(to right, #fff 20%, #00f2fe 50%, #fff 80%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 900;
-            filter: drop-shadow(0 2px 10px rgba(0,0,0,0.5));
-        }
-        
-        p.subtitle {
-            color: #94a3b8;
-            font-size: 1.05rem;
-            margin-bottom: 40px;
-            max-width: 420px;
-            text-align: center;
-            line-height: 1.6;
-            padding: 0 20px;
-        }
-
-        /* HD Glossy Buttons */
-        .btn {
-            padding: 16px 45px;
-            font-size: 1.25rem;
-            font-weight: bold;
-            color: white;
-            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 10px 30px rgba(0, 242, 254, 0.4);
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .btn:hover {
-            transform: translateY(-4px) scale(1.03);
-            box-shadow: 0 15px 40px rgba(0, 242, 254, 0.6);
-        }
-        .btn:active {
-            transform: translateY(-1px);
-        }
-
-        /* HUD Overlay Layout */
-        #hud {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 5;
-            color: white;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .hud-card {
-            background: rgba(15, 23, 42, 0.65);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 10px 20px;
-            border-radius: 14px;
-        }
-        .hud-label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #38bdf8;
-        }
-        .hud-value {
-            font-size: 1.6rem;
-            font-weight: 800;
-        }
-
-        /* Fullscreen and Exit Control Bar */
-        #utility-bar {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 5;
-            display: flex;
-            gap: 12px;
-        }
-        .util-btn {
-            background: rgba(15, 23, 42, 0.65);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: white;
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.2s ease;
-            font-size: 1.2rem;
-        }
-        .util-btn:hover {
-            background: rgba(56, 189, 248, 0.2);
-            border-color: #38bdf8;
-            transform: translateY(-2px);
-        }
-
-        /* Mobile Responsive Touch Controls */
-        #touch-controls {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 5;
-            display: none;
-            grid-template-columns: repeat(3, 68px);
-            grid-template-rows: repeat(2, 68px);
-            gap: 10px;
-        }
-        .joy-btn {
-            background: rgba(255,255,255,0.12);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.18);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 1.4rem;
-        }
-        .joy-btn:active { background: rgba(56, 189, 248, 0.4); }
-        #btn-up { grid-column: 2; }
-        #btn-left { grid-column: 1; grid-row: 2; }
-        #btn-down { grid-column: 2; grid-row: 2; }
-        #btn-right { grid-column: 3; grid-row: 2; }
-
-        @media (max-width: 768px) {
-            #touch-controls { display: grid; }
-            h1 { font-size: 2.2rem; }
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#050510">
+<meta name="description" content="Balance Sphere — an endless 3D rolling ball game.">
+<title>Balance Sphere — Infinite Dimensions</title>
+<style>
+:root{--cyan:#00eaff;--blue:#4facfe;--panel:rgba(8,17,39,.78);--line:rgba(255,255,255,.16)}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#050510;color:#fff}
+#canvas-container{position:fixed;inset:0;z-index:0}
+#canvas-container canvas{display:block;width:100%;height:100%;touch-action:none}
+.ui-screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:24px;background:radial-gradient(circle at 50% 40%,rgba(15,30,62,.88),rgba(2,5,18,.96));transition:opacity .3s,transform .3s}
+.hidden{opacity:0!important;pointer-events:none!important;visibility:hidden}
+.logo{width:clamp(88px,20vw,132px);height:clamp(88px,20vw,132px);border-radius:50%;display:grid;place-items:center;margin-bottom:22px;background:linear-gradient(135deg,#00f2fe,#4facfe);border:3px solid #ffffff55;box-shadow:0 0 45px #00d9ff55;position:relative;animation:float 4s ease-in-out infinite}
+.logo:after{content:"";position:absolute;inset:9%;border:2px dashed #ffffff99;border-radius:50%;animation:spin 18s linear infinite}
+.logo svg{width:58%;height:58%;filter:drop-shadow(0 5px 5px #001)}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes float{50%{transform:translateY(-9px)}}
+h1{font-size:clamp(2rem,7vw,3.2rem);font-weight:900;letter-spacing:.04em;line-height:1.1;margin-bottom:12px;background:linear-gradient(90deg,#fff 10%,#00f2fe 55%,#fff 90%);color:transparent;background-clip:text;-webkit-background-clip:text}
+.subtitle{max-width:440px;color:#b8c7df;line-height:1.6;font-size:clamp(.9rem,2.6vw,1.05rem);margin:0 auto 28px}
+.btn{border:0;border-radius:999px;padding:15px 34px;min-height:52px;color:#03101f;background:linear-gradient(135deg,#00f2fe,#4facfe);font-size:1rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;box-shadow:0 8px 28px #00d9ff38}
+.btn:active{transform:scale(.98)}
+#hud{position:fixed;top:max(12px,env(safe-area-inset-top));left:12px;z-index:5;display:flex;gap:8px;pointer-events:none}
+.hud-card{min-width:105px;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:13px;padding:9px 13px}
+.hud-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#58dfff}.hud-value{font-size:1.4rem;font-weight:900;line-height:1.3}
+#utility-bar{position:fixed;top:max(12px,env(safe-area-inset-top));right:12px;z-index:15;display:flex;gap:8px}
+.util-btn{width:46px;height:46px;border:1px solid #7beaff88;border-radius:13px;background:#08172de8;color:#fff;font-size:1.35rem;font-weight:800;display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 18px #0005}
+.util-btn:active{background:#087ca4}
+#touch-controls{position:fixed;bottom:max(18px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:5;display:none;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,58px);gap:8px;touch-action:none}
+.joy-btn{border:1px solid #ffffff55;border-radius:18px;background:#0c1b31c9;color:#fff;font-size:1.5rem;font-weight:800;display:grid;place-items:center;backdrop-filter:blur(8px);touch-action:none}
+.joy-btn:active,.joy-btn.pressed{background:#0785b9d9}
+#btn-up{grid-column:2;grid-row:1}#btn-left{grid-column:1;grid-row:2}#btn-down{grid-column:2;grid-row:2}#btn-right{grid-column:3;grid-row:2}
+#hint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;color:#d9edff;background:#071326b8;border:1px solid #ffffff22;border-radius:20px;padding:8px 14px;font-size:.78rem;white-space:nowrap;pointer-events:none}
+@media(max-width:700px){#touch-controls{display:grid}#hint{bottom:153px;font-size:.7rem}#hud{gap:6px}.hud-card{min-width:88px;padding:7px 10px}.hud-value{font-size:1.2rem}.util-btn{width:42px;height:42px}}
+@media(max-height:520px){.logo{width:65px;height:65px;margin-bottom:8px}.subtitle{margin-bottom:12px}.btn{min-height:44px;padding:10px 25px}h1{font-size:1.8rem}#touch-controls{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,42px);gap:5px}.joy-btn{border-radius:13px}#hint{bottom:105px}}
+</style>
 </head>
 <body>
+<div id="canvas-container" aria-label="3D Balance Sphere game"></div>
 
-    <!-- WebGL Viewport Container -->
-    <div id="canvas-container"></div>
+<div id="hud" class="hidden">
+  <div class="hud-card"><div class="hud-label">Distance score</div><div id="score-val" class="hud-value">0</div></div>
+  <div class="hud-card"><div class="hud-label">Level</div><div id="level-val" class="hud-value">1</div></div>
+</div>
+<div id="utility-bar">
+  <button class="util-btn" id="btn-fullscreen" title="Toggle fullscreen" aria-label="Toggle fullscreen">⛶</button>
+  <button class="util-btn" id="btn-exit" title="Exit to home" aria-label="Exit to home">✕</button>
+</div>
+<div id="home-screen" class="ui-screen">
+  <div class="logo" aria-label="Balance Sphere logo">
+    <svg viewBox="0 0 100 100" role="img" aria-hidden="true"><defs><linearGradient id="ballGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".45" stop-color="#d9faff"/><stop offset="1" stop-color="#2476c9"/></linearGradient></defs><circle cx="50" cy="50" r="34" fill="url(#ballGrad)" stroke="#fff" stroke-width="2"/><path d="M18 40 Q50 10 82 40 M17 59 Q50 88 83 59 M50 16 Q32 50 50 84 M50 16 Q68 50 50 84" fill="none" stroke="#0874b9" stroke-width="3" opacity=".8"/><path d="M15 50 H85" stroke="#fff" stroke-width="2" opacity=".65"/></svg>
+  </div>
+  <h1>Balance Sphere</h1>
+  <p class="subtitle">Control the sphere, keep your balance, and travel across an endless 3D pathway. How far can you go?</p>
+  <button class="btn" id="btn-play">Play Now</button>
+</div>
+<div id="gameover-screen" class="ui-screen hidden">
+  <div class="logo" style="animation:none"><span style="font-size:3.5rem">✦</span></div>
+  <h1 style="background-image:linear-gradient(90deg,#ff416c,#ff9a44);background-clip:text;-webkit-background-clip:text">Sphere Fallen!</h1>
+  <p class="subtitle" id="final-stats">Your sphere left the pathway.</p>
+  <button class="btn" id="btn-restart" style="background:linear-gradient(135deg,#ff416c,#ff9a44);color:white">Try Again</button>
+</div>
+<div id="touch-controls">
+  <button class="joy-btn" id="btn-up" aria-label="Move forward">↑</button>
+  <button class="joy-btn" id="btn-left" aria-label="Move left">←</button>
+  <button class="joy-btn" id="btn-down" aria-label="Move backward">↓</button>
+  <button class="joy-btn" id="btn-right" aria-label="Move right">→</button>
+</div>
+<div id="hint" class="hidden">Move: WASD / Arrow keys · Mobile: touch arrows</div>
 
-    <!-- Gameplay Live HUD Screen -->
-    <div id="hud" class="hidden">
-        <div class="hud-card">
-            <div class="hud-label">Distance Score</div>
-            <div id="score-val" class="hud-value">0</div>
-        </div>
-        <div class="hud-card">
-            <div class="hud-label">Infinite Level</div>
-            <div id="level-val" class="hud-value">1</div>
-        </div>
-    </div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const homeScreen=$('home-screen'), gameoverScreen=$('gameover-screen'), hud=$('hud'), hint=$('hint');
+let scene,camera,renderer,ball,ballMesh,ballShadow;
+let platforms=[],decorations=[];
+let isPlaying=false,animationId=0,lastTime=0,score=0,level=1,forwardSpeed=8;
+let nextZ=0,elapsed=0;
+const keys={up:false,down:false,left:false,right:false};
+const velocity=new THREE.Vector3();
+const gravity=22, acceleration=26, friction=0.91, maxSideSpeed=9;
+const ballRadius=.62, platformWidth=7, segmentLength=14;
+const clock=new THREE.Clock();
 
-    <!-- UI Action Interface Bar -->
-    <div id="utility-bar">
-        <button class="util-btn" id="btn-fullscreen" title="Toggle Fullscreen">⛶</button>
-        <button class="util-btn" id="btn-exit" title="Exit to Home">✕</button>
-    </div>
-
-    <!-- Logo / Landing Entry Screen -->
-    <div id="home-screen" class="ui-screen">
-        <div class="game-logo">
-            <span class="game-logo-inner">⚽</span>
-        </div>
-        <h1>Balance Sphere</h1>
-        <p class="subtitle">Control the sphere, maintain equilibrium, and navigate through endless procedural pathways.</p>
-        <button class="btn" id="btn-play">Play Now</button>
-    </div>
-
-    <!-- Game Over Screen Layout -->
-    <div id="gameover-screen" class="ui-screen hidden">
-        <h1 style="background: linear-gradient(to right, #ff416c, #ff4b2b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Sphere Fallen!</h1>
-        <p class="subtitle" id="final-stats">You survived up to Level 1.</p>
-        <button class="btn" id="btn-restart" style="background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); box-shadow: 0 10px 30px rgba(255, 65, 108, 0.4);">Try Again</button>
-    </div>
-
-    <!-- Mobile Virtual Joystick Buttons -->
-    <div id="touch-controls">
-        <div class="joy-btn" id="btn-up">↑</div>
-        <div class="joy-btn" id="btn-left">←</div>
-        <div class="joy-btn" id="btn-down">↓</div>
-        <div class="joy-btn" id="btn-right">→</div>
-    </div>
-
-    <script>
-        // Core Physics and Rendering Architecture State Variable setup
-        let scene, camera, renderer, ball;
-        let platforms = [];
-        let keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, w: false, s: false, a: false, d: false };
-        let touchKeys = { up: false, down: false, left: false, right: false };
-        let isPlaying = false;
-        
-        // Physics Engine Constants
-        let score = 0;
-        let currentLevel = 1;
-        let ballVelocity = new THREE.Vector3();
-        const gravity = 0.008;
-        const speedMultiplier = 0.01;
-        const maxVelocity = 0.24;
-        
-        // Procedural Platform Configuration Fields
-        let nextPlatformZ = 0;
-        const basePlatformWidth = 5.5;
-        const segmentLength = 30;
+function init3DEngine(){
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x050510);
+  scene.fog=new THREE.Fog(0x050510,28,105);
+  camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,250);
+  camera.position.set(0,7,10);
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  $('canvas-container').appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0x9bdcff,0x12152e,2.0));
+  const keyLight=new THREE.DirectionalLight(0xffffff,2.4);
+  keyLight.position.set(-5,12,7);keyLight.castShadow=true;keyLight.shadow.mapSize.set(1024,1024);
+  scene.add(keyLight);
+  const rim=new THREE.PointLight(0x00d9ff,22,45);rim.position.set(5,5,-12);scene.add(rim);
+  createBall();
+  makePlatform(0,-7,segmentLength,0);
+  makePlatform(0,-21,segmentLength,0);
+  nextZ=-28;
+  createStars();
+  bindInputEventListeners();
+  window.addEventListener('resize',onWindowResize);
+  animate();
 }
-function bindInputEventListeners() {
-// Key binding hook configurations
-window.addEventListener('keydown', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
-window.addEventListener('keyup', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
-// Mobile Device Virtual Interface Input touch binding logic setup
-const hookTouchSystem = (targetId, mapKey) => {
-const element = document.getElementById(targetId);
-element.addEventListener('touchstart', (e) => { e.preventDefault(); touchKeys[mapKey] = true; }, {passive: false});
-element.addEventListener('touchend', (e) => { e.preventDefault(); touchKeys[mapKey] = false; }, {passive: false});
-};
-hookTouchSystem('btn-up', 'up');
-hookTouchSystem('btn-down', 'down');
-hookTouchSystem('btn-left', 'left');
-hookTouchSystem('btn-right', 'right');
-// Button Click Interface Hooks Setup
-document.getElementById('btn-play').addEventListener('click', launchSession);
-document.getElementById('btn-restart').addEventListener('click', launchSession);
-document.getElementById('btn-exit').addEventListener('click', () => {
-isPlaying = false;
-hud.classList.add('hidden');
-gameoverScreen.classList.add('hidden');
-homeScreen.classList.remove('hidden');
-});
-document.getElementById('btn-fullscreen').addEventListener('click', () => {
-if (!document.fullscreenElement) {
-document.documentElement.requestFullscreen().catch(() => {});
-} else {
-document.exitFullscreen();
+function createBall(){
+  const geo=new THREE.SphereGeometry(ballRadius,32,24);
+  const mat=new THREE.MeshStandardMaterial({color:0x46d9ff,metalness:.55,roughness:.22,emissive:0x052b49});
+  ballMesh=new THREE.Mesh(geo,mat);ballMesh.castShadow=true;ballMesh.receiveShadow=true;
+  ball=new THREE.Group();ball.add(ballMesh);ball.position.set(0,ballRadius+.18,1);scene.add(ball);
+  const shadowGeo=new THREE.CircleGeometry(.78,32);
+  const shadowMat=new THREE.MeshBasicMaterial({color:0x00dfff,transparent:true,opacity:.24,depthWrite:false});
+  ballShadow=new THREE.Mesh(shadowGeo,shadowMat);ballShadow.rotation.x=-Math.PI/2;ballShadow.position.y=.025;scene.add(ballShadow);
+  const stripe=new THREE.Mesh(new THREE.TorusGeometry(ballRadius*.72,.045,8,48),new THREE.MeshStandardMaterial({color:0xffffff,metalness:.4,roughness:.25,emissive:0x0a5c86}));
+  stripe.rotation.x=Math.PI/2;ballMesh.add(stripe);
 }
-});
+function makePlatform(x,z,length,width=platformWidth){
+  const geo=new THREE.BoxGeometry(width,.55,length);
+  const mat=new THREE.MeshStandardMaterial({color:0x142947,metalness:.45,roughness:.35,emissive:0x06172b});
+  const mesh=new THREE.Mesh(geo,mat);mesh.position.set(x,-.3,z);mesh.receiveShadow=true;mesh.castShadow=true;
+  scene.add(mesh);platforms.push({mesh,x,z,length,width});
+  const edgeMat=new THREE.MeshStandardMaterial({color:0x00dfff,emissive:0x007caa,metalness:.4,roughness:.25});
+  for(const side of [-1,1]){
+    const edge=new THREE.Mesh(new THREE.BoxGeometry(.075,.07,length),edgeMat);
+    edge.position.set(x+side*(width/2-.05),.02,z);scene.add(edge);decorations.push(edge);
+  }
+  // Small glowing markers along both edges make the path readable.
+  for(let dz=-length/2+2;dz<length/2;dz+=4){
+    for(const side of [-1,1]){
+      const marker=new THREE.Mesh(new THREE.BoxGeometry(.14,.08,.38),new THREE.MeshBasicMaterial({color:0x57efff}));
+      marker.position.set(x+side*(width/2-.28),.06,z+dz);scene.add(marker);decorations.push(marker);
+    }
+  }
 }
-function onWindowResize() {
-camera.aspect = window.innerWidth / window.innerHeight;
-camera.updateProjectionMatrix();
-renderer.setSize(window.innerWidth, window.innerHeight);
+function createStars(){
+  const positions=[];
+  for(let i=0;i<650;i++)positions.push((Math.random()-.5)*150,Math.random()*65-5,-Math.random()*180+25);
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  const stars=new THREE.Points(geo,new THREE.PointsMaterial({color:0x9bcfff,size:.18,transparent:true,opacity:.8}));
+  scene.add(stars);
 }
-// Initialize App layer on structural window DOM resolution cycles
-window.onload = () => {
-init3DEngine();
-executionCycle();
-};
-
+function resetWorld(){
+  platforms.forEach(p=>scene.remove(p.mesh));platforms=[];
+  decorations.forEach(d=>scene.remove(d));decorations=[];
+  // Keep world scenery simple and deterministic at each restart.
+  makePlatform(0,-7,segmentLength,0);
+  makePlatform(0,-21,segmentLength,0);
+  nextZ=-28;
+}
+function generateAhead(){
+  while(nextZ > ball.position.z-105){
+    const previous=platforms[platforms.length-1];
+    const maxShift=Math.min(2.0,0.35+level*.08);
+    const shift=(Math.random()-.5)*maxShift*2;
+    const x=THREE.MathUtils.clamp((previous?previous.x:0)+shift,-2.2,2.2);
+    const width=Math.max(4.6,platformWidth-Math.min(1.4,level*.08));
+    makePlatform(x,nextZ,segmentLength,width);
+    nextZ-=segmentLength;
+  }
+  platforms=platforms.filter(p=>{if(p.z>ball.position.z+35){scene.remove(p.mesh);return false;}return true;});
+  decorations=decorations.filter(d=>{if(d.position.z>ball.position.z+35){scene.remove(d);return false;}return true;});
+}
+function launchSession(){
+  resetWorld();score=0;level=1;elapsed=0;forwardSpeed=8;
+  ball.position.set(0,ballRadius+.18,1);ball.rotation.set(0,0,0);velocity.set(0,0,0);
+  camera.position.set(0,7,10);camera.lookAt(0,0,-8);
+  isPlaying=true;lastTime=performance.now();
+  homeScreen.classList.add('hidden');gameoverScreen.classList.add('hidden');
+  hud.classList.remove('hidden');hint.classList.remove('hidden');
+  $('score-val').textContent='0';$('level-val').textContent='1';
+  Object.keys(keys).forEach(k=>keys[k]=false);
+}
+function endGame(){
+  if(!isPlaying)return;
+  isPlaying=false;
+  $('final-stats').textContent=`Distance score: ${score} · Level reached: ${level}. Keep practicing!`;
+  gameoverScreen.classList.remove('hidden');hud.classList.add('hidden');hint.classList.add('hidden');
+  Object.keys(keys).forEach(k=>keys[k]=false);
+}
+function bindInputEventListeners(){
+  const keyMap={ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down',ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right'};
+  window.addEventListener('keydown',e=>{const k=keyMap[e.key];if(k){keys[k]=true;e.preventDefault();}});
+  window.addEventListener('keyup',e=>{const k=keyMap[e.key];if(k){keys[k]=false;e.preventDefault();}});
+  window.addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));
+  const map={'btn-up':'up','btn-down':'down','btn-left':'left','btn-right':'right'};
+  Object.entries(map).forEach(([id,key])=>{
+    const el=$(id);
+    const on=e=>{e.preventDefault();keys[key]=true;el.classList.add('pressed');try{el.setPointerCapture(e.pointerId)}catch(_){}};
+    const off=e=>{e.preventDefault();keys[key]=false;el.classList.remove('pressed')};
+    el.addEventListener('pointerdown',on);el.addEventListener('pointerup',off);
+    el.addEventListener('pointercancel',off);el.addEventListener('lostpointercapture',off);
+    el.addEventListener('contextmenu',e=>e.preventDefault());
+  });
+  $('btn-play').addEventListener('click',launchSession);
+  $('btn-restart').addEventListener('click',launchSession);
+  $('btn-exit').addEventListener('click',()=>{
+    isPlaying=false;hud.classList.add('hidden');hint.classList.add('hidden');
+    gameoverScreen.classList.add('hidden');homeScreen.classList.remove('hidden');
+    Object.keys(keys).forEach(k=>keys[k]=false);
+  });
+  $('btn-fullscreen').addEventListener('click',async()=>{
+    try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen();else await document.exitFullscreen()}catch(e){}
+  });
+  document.addEventListener('fullscreenchange',()=>{$('btn-fullscreen').textContent=document.fullscreenElement?'⤢':'⛶';});
+}
+function update(dt){
+  if(!isPlaying)return;
+  elapsed+=dt;forwardSpeed=8+Math.min(7,elapsed*.07);
+  const ix=(keys.right?1:0)-(keys.left?1:0);
+  const iz=(keys.down?1:0)-(keys.up?1:0);
+  velocity.x+=ix*acceleration*dt;
+  velocity.x*=Math.pow(friction,dt*60);
+  velocity.x=THREE.MathUtils.clamp(velocity.x,-maxSideSpeed,maxSideSpeed);
+  // Forward movement is the endless-runner baseline; up/down gently changes pace.
+  const zSpeed=forwardSpeed + (iz<0?2:iz>0?-2:0);
+  ball.position.x+=velocity.x*dt;
+  ball.position.z-=Math.max(3,zSpeed)*dt;
+  ball.position.y=ballRadius+.18+Math.abs(Math.sin(elapsed*5))*.045;
+  ballMesh.rotation.x-=dt*forwardSpeed/ballRadius;
+  ballMesh.rotation.z-=velocity.x*dt/ballRadius;
+  ballShadow.position.set(ball.position.x,.02,ball.position.z);
+  camera.position.x+=(ball.position.x*.45-camera.position.x)*Math.min(1,dt*3);
+  camera.position.z=ball.position.z+10;
+  camera.position.y=7.3;
+  camera.lookAt(ball.position.x*.55,0,ball.position.z-7);
+  generateAhead();
+  // A segment supports the ball when its top surface is close in X and Z.
+  const support=platforms.some(p=>
+    Math.abs(ball.position.x-p.x)<=p.width/2-ballRadius*.45 &&
+    ball.position.z<=p.z+p.length/2+ballRadius*.2 &&
+    ball.position.z>=p.z-p.length/2-ballRadius*.2
+  );
+  if(!support || ball.position.y < -3 || Math.abs(ball.position.x)>14){endGame();return;}
+  score=Math.max(score,Math.floor(Math.abs(ball.position.z)/2));
+  level=1+Math.floor(score/180);
+  $('score-val').textContent=score.toLocaleString();
+  $('level-val').textContent=level;
+}
+function animate(now){
+  animationId=requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.04);
+  update(dt);
+  renderer.render(scene,camera);
+}
+function onWindowResize(){
+  if(!camera||!renderer)return;
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));renderer.setSize(innerWidth,innerHeight);
+}
+try{init3DEngine()}catch(err){console.error(err);$('home-screen').innerHTML='<h1>Unable to load game</h1><p class="subtitle">Please check your internet connection and reload. The game requires WebGL support.</p>'}
+})();
+</script>
+</body>
+</html>
